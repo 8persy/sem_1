@@ -14,6 +14,21 @@ HOST = '127.0.0.1'
 PORT = 65432
 
 
+class Room:
+    def __init__(self, name: str):
+        self.name = name
+        self.clients = []  # type: [socket.socket]
+        self.name = []  # type: [str]
+
+    def room_broadcast(self, msg):
+        for client in self.clients:
+            client.sendall(pickle.dumps({"type": "start", "word": msg}))
+
+    def remove_client(self, client):
+        if client in self.clients:
+            self.clients.remove(client)
+
+
 # Server Code
 class GameServer:
     def __init__(self, host, port):
@@ -29,7 +44,8 @@ class GameServer:
         self.server_socket.listen(5)
         print(f"Server started on {self.host}:{self.port}")
 
-    def check_word(self, reference, word):
+    @staticmethod
+    def check_word(reference, word):
         word_counter = Counter(word)
         reference_counter = Counter(reference)
         print(word_counter)

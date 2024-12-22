@@ -1,6 +1,5 @@
 import sys
 import pickle
-# import random
 import socket
 import threading
 from PyQt6.QtWidgets import (
@@ -74,6 +73,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.info_label)
 
         self.room_input = QLineEdit()
+        self.room_input.editingFinished.connect(self.join_room)
         self.room_input.setPlaceholderText("Enter room name")
         self.layout.addWidget(self.room_input)
 
@@ -89,6 +89,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.word_label)
 
         self.word_input = QLineEdit()
+        self.word_input.editingFinished.connect(self.submit_word)
         self.word_input.setPlaceholderText("Enter your word")
         self.layout.addWidget(self.word_input)
 
