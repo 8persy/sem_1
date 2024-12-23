@@ -73,9 +73,13 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.info_label)
 
         self.room_input = QLineEdit()
-        self.room_input.editingFinished.connect(self.join_room)
+        # self.room_input.editingFinished.connect(self.join_room)
         self.room_input.setPlaceholderText("Enter room name")
         self.layout.addWidget(self.room_input)
+
+        self.create_button = QPushButton("Create Room")
+        self.create_button.clicked.connect(self.create_room)
+        self.layout.addWidget(self.create_button)
 
         self.join_button = QPushButton("Join Room")
         self.join_button.clicked.connect(self.join_room)
@@ -89,7 +93,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.word_label)
 
         self.word_input = QLineEdit()
-        self.word_input.editingFinished.connect(self.submit_word)
+        # self.word_input.editingFinished.connect(self.submit_word)
         self.word_input.setPlaceholderText("Enter your word")
         self.layout.addWidget(self.word_input)
 
@@ -104,6 +108,11 @@ class MainWindow(QMainWindow):
 
         self.central_widget.setLayout(self.layout)
         self.setCentralWidget(self.central_widget)
+
+    def create_room(self):
+        room_name = self.room_input.text()
+        if room_name:
+            self.client.send({"command": "create_room", "room": room_name})
 
     def join_room(self):
         room_name = self.room_input.text()
@@ -120,6 +129,7 @@ class MainWindow(QMainWindow):
         room_name = self.room_input.text()
         if word and room_name:
             self.client.send({"command": "submit_word", "room": room_name, "word": word, "player": "Player1"})
+            self.word_input.clear()
 
     def handle_server_message(self, message):
         if message["type"] == "info":
