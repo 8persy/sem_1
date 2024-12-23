@@ -18,15 +18,26 @@ class Room:
     def __init__(self, name: str):
         self.name = name
         self.clients = []  # type: [socket.socket]
-        self.name = []  # type: [str]
+        self.names = []  # type: [str]
+        self.words_history = []  # type: [str]
 
-    def room_broadcast(self, msg):
+    def room_broadcast(self, msg_type: str, msg2_type: str, msg: str):
         for client in self.clients:
-            client.sendall(pickle.dumps({"type": "start", "word": msg}))
+            client.sendall(pickle.dumps({"type": msg_type, msg2_type: msg}))
 
-    def remove_client(self, client):
+    def is_correct_word(self, word: str):
+        if word in self.words_history:
+            return False
+        return True
+
+    def add_client(self, client: socket.socket, name: str):
+        self.clients.append(client)
+        self.names.append(name)
+
+    def remove_client(self, client: socket.socket, name: str):
         if client in self.clients:
             self.clients.remove(client)
+            self.names.append(name)
 
 
 # Server Code
@@ -35,7 +46,7 @@ class GameServer:
         self.host = host
         self.port = port
         self.clients = []  # type: [socket.socket] # List of connected clients
-        self.rooms = {}  # type: {str: list[socket.socket]} # {room_name: [clients]}
+        self.rooms = []  # type: [Room] # {room_name: [clients]}
         self.dataset = ["example", "python", "pickle", "thread", "socket", "server"]
         self.scores = {}  # type: {str: int} # {client_name: score}
         self.current_words = {}  # type: {str: str} # {room_name: current_word}
@@ -48,28 +59,24 @@ class GameServer:
     def check_word(reference, word):
         word_counter = Counter(word)
         reference_counter = Counter(reference)
-        print(word_counter)
-        print(reference_counter)
 
         for letter, count in word_counter.items():
             if count > reference_counter.get(letter, 0):
-                print(count, letter)
-                print(reference_counter.get(letter, 0))
-                print("error")
                 return False
 
         return True
 
-    def broadcast(self, message, room):
-        """Send a message to all clients in the room."""
-        for client in self.rooms.get(room, []):
-            try:
-                client.sendall(pickle.dumps(message))
-            except Exception as e:
-                print(f"Error broadcasting to {client}: {e}")
+    # def broadcast(self, message, room):
+    #     """Send a message to all clients in the room."""
+    #     for client in self.rooms.get(room, []):
+    #         try:
+    #             client.sendall(pickle.dumps(message))
+    #         except Exception as e:
+    #             print(f"Error broadcasting to {client}: {e}")
 
-    def handle_client(self, client, address):
+    def handle_client(self, client: socket.socket, address):
         """Handle a single client."""
+        client_name = 'lox'  # fixme: add name!!!
         print(f"New connection from {address}")
         try:
             while True:
@@ -79,25 +86,51 @@ class GameServer:
                 message = pickle.loads(data)
                 command = message.get("command")
 
+                if command == 'create_room':
+                    room_name = message['room']
+                    print(room_name, 'create...')
+                    room = Room(room_name)
+                    self.rooms.append(room)
+                    room.add_client(client, client_name)
+                    room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} created {room_name}')
+                    print('created')
+
                 if command == "join_room":
-                    room = message["room"]
-                    self.rooms.setdefault(room, []).append(client)
-                    self.broadcast({"type": "info", "message": f"{address} joined {room}"}, room)
+                    room_name = message['room']
+                    for room in self.rooms:
+                        if room.name == room_name:
+                            room.add_client(client, client_name)
+                            room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} joined {room_name}')
+                            print(room_name, 'join')
+
+                    else:
+                        client.sendall(pickle.dumps({'type': 'info', 'message': "There's no room like this"}))
 
                 elif command == "start_game":
-                    room = message["room"]
+                    room_name = message['room']
                     word = random.choice(self.dataset)
-                    self.current_words[room] = word
-                    self.broadcast({"type": "start", "word": word}, room)
+
+                    for room in self.rooms:
+                        if room.name == room_name:
+                            self.current_words[room_name] = word
+                            room.room_broadcast(msg_type='start', msg2_type='word', msg=word)
 
                 elif command == "submit_word":
-                    room = message["room"]
-                    player = message["player"]
+                    room_name = message['room']
+                    player = message['player']
                     word = message["word"]
 
-                    if self.check_word(word=word, reference=self.current_words[room]):
-                        self.scores[player] = self.scores.get(player, 0) + 1
-                        self.broadcast({"type": "score", "scores": self.scores}, room)
+                    for curr_room in self.rooms:
+                        if room_name == curr_room.name:
+                            room = curr_room
+                            print('info done')
+
+                            if (self.check_word(word=word, reference=self.current_words[room_name])
+                                    and room.is_correct_word(word)):
+                                self.scores[player] = self.scores.get(player, 0) + 1
+                                room.room_broadcast(msg_type='score', msg2_type='scores', msg=self.scores)
+                                room.words_history.append(word)
+                                break
 
         except Exception as e:
             print(f"Error with client {address}: {e}")
