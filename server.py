@@ -3,7 +3,7 @@ import pickle
 import random
 import socket
 import threading
-
+from words import Words
 # Constants
 HOST = '127.0.0.1'
 PORT = 65432
@@ -42,7 +42,8 @@ class GameServer:
         self.port = port
         self.clients = []  # type: [socket.socket] # List of connected clients
         self.rooms = []  # type: [Room] # {room_name: [clients]}
-        self.dataset = ["example", "python", "pickle", "thread", "socket", "server"]
+        words = Words()
+        self.dataset = words.words
         self.scores = {}  # type: {str: int} # {client_name: score}
         self.current_words = {}  # type: {str: str} # {room_name: current_word}
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -60,14 +61,6 @@ class GameServer:
                 return False
 
         return True
-
-    # def broadcast(self, message, room):
-    #     """Send a message to all clients in the room."""
-    #     for client in self.rooms.get(room, []):
-    #         try:
-    #             client.sendall(pickle.dumps(message))
-    #         except Exception as e:
-    #             print(f"Error broadcasting to {client}: {e}")
 
     def handle_client(self, client: socket.socket, address):
         """Handle a single client."""
@@ -88,16 +81,15 @@ class GameServer:
                     self.rooms.append(room)
                     room.add_client(client, client_name)
                     room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} created {room_name}')
-                    print('created')
 
                 if command == "join_room":
                     room_name = message['room']
                     for room in self.rooms:
                         if room.name == room_name:
                             room.add_client(client, client_name)
-                            room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} joined {room_name}')
-                            print(room_name, 'join')
-
+                            room.room_broadcast(msg_type='info', msg2_type='message',
+                                                msg=f'{client_name} joined {room_name}')
+                            break
                     else:
                         client.sendall(pickle.dumps({'type': 'info', 'message': "There's no room like this"}))
 
@@ -109,6 +101,7 @@ class GameServer:
                         if room.name == room_name:
                             self.current_words[room_name] = word
                             room.room_broadcast(msg_type='start', msg2_type='word', msg=word)
+                            break
 
                 elif command == "submit_word":
                     room_name = message['room']
