@@ -149,10 +149,6 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    # # Start server in a separate thread
-    # server = GameServer(HOST, PORT)
-    # threading.Thread(target=server.start, daemon=True).start()
-
     # Start client and GUI
     client = Client(HOST, PORT)
     client.client_connect()

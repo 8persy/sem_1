@@ -3,11 +3,6 @@ import pickle
 import random
 import socket
 import threading
-# from PyQt6.QtWidgets import (
-#     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-#     QLineEdit, QMessageBox, QTableWidget, QTableWidgetItem
-# )
-# from PyQt6.QtCore import pyqtSignal, QObject
 
 # Constants
 HOST = '127.0.0.1'
@@ -151,21 +146,8 @@ class GameServer:
             self.server_socket.close()
 
 
-# Client Code
-
 # Main Execution
 if __name__ == "__main__":
-    # app = QApplication(sys.argv)
-
     # Start server in a separate thread
     server = GameServer(HOST, PORT)
     threading.Thread(target=server.start).start()
-
-    # Start client and GUI
-    # client = Client(HOST, PORT)
-    # client.connect()
-    #
-    # window = MainWindow(client)
-    # window.show()
-
-    # sys.exit(app.exec())
