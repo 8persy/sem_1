@@ -34,6 +34,7 @@ class Room:
         if client in self.clients:
             self.clients.remove(client)
             self.names.remove(name)
+            self.room_broadcast(msg_type='info', msg2_type='message', msg=f'player {name} left game')
 
 
 # Server Code
