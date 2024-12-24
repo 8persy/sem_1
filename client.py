@@ -153,6 +153,10 @@ class MainWindow(QMainWindow):
         self.score_table.setHorizontalHeaderLabels(["Player", "Score"])
         self.layout.addWidget(self.score_table)
 
+        self.exit_button = QPushButton('exit')
+        self.exit_button.clicked.connect(self.exit)
+        self.layout.addWidget(self.exit_button)
+
         self.central_widget.setLayout(self.layout)
         self.setCentralWidget(self.central_widget)
 
@@ -193,6 +197,11 @@ class MainWindow(QMainWindow):
         for i, (player, score) in enumerate(scores.items()):
             self.score_table.setItem(i, 0, QTableWidgetItem(player))
             self.score_table.setItem(i, 1, QTableWidgetItem(str(score)))
+
+    def exit(self):
+        self.client.send({"command": "exit"})
+        self.client.disconnect()
+        self.close()
 
 
 if __name__ == "__main__":

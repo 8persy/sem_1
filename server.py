@@ -33,7 +33,7 @@ class Room:
     def remove_client(self, client: socket.socket, name: str):
         if client in self.clients:
             self.clients.remove(client)
-            self.names.append(name)
+            self.names.remove(name)
 
 
 # Server Code
@@ -43,8 +43,8 @@ class GameServer:
         self.host = host
         self.port = port
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.listen(5)
         self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(5)
 
         # for thread
         self.lock = Lock()
@@ -81,6 +81,7 @@ class GameServer:
     def handle_client(self, client: socket.socket, address):
         """Handle a single client."""
         client_name = ''
+        room = None
         print(f"New connection from {address}")
         try:
             while True:
@@ -108,7 +109,6 @@ class GameServer:
 
                 if command == 'create_room':
                     room_name = message['room']
-                    print(room_name, 'create...')
                     room = Room(room_name)
                     self.rooms.append(room)
                     room.add_client(client, client_name)
@@ -143,7 +143,6 @@ class GameServer:
                     for curr_room in self.rooms:
                         if room_name == curr_room.name:
                             room = curr_room
-                            print('info done')
 
                             if (self.check_word(word=word, reference=self.current_words[room_name])
                                     and room.is_correct_word(word)):
@@ -151,6 +150,11 @@ class GameServer:
                                 room.room_broadcast(msg_type='score', msg2_type='scores', msg=self.scores)
                                 room.words_history.append(word)
                                 break
+
+                elif command == 'exit':
+                    self.clients.remove(client)
+                    if room:
+                        room.remove_client(client, client_name)
 
         except Exception as e:
             print(f"Error with client {address}: {e}")
