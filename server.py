@@ -3,6 +3,7 @@ import pickle
 import random
 import socket
 import threading
+from threading import Lock
 from words import Words
 # Constants
 HOST = '127.0.0.1'
@@ -38,17 +39,32 @@ class Room:
 # Server Code
 class GameServer:
     def __init__(self, host, port):
+        # connection
         self.host = host
         self.port = port
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.listen(5)
+        self.server_socket.bind((self.host, self.port))
+
+        # for thread
+        self.lock = Lock()
+
+        # clients
+        self.names_passwords = {}  # type: {str: str} # {name: password}
         self.clients = []  # type: [socket.socket] # List of connected clients
+        self.clients_with_name = {}  # type: {socket.socket: str} # {soket: name}
+
+        # rooms
         self.rooms = []  # type: [Room] # {room_name: [clients]}
+
+        # data of words
         words = Words()
         self.dataset = words.words
-        self.scores = {}  # type: {str: int} # {client_name: score}
         self.current_words = {}  # type: {str: str} # {room_name: current_word}
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
+
+        # for tables or scores
+        self.scores = {}  # type: {str: int} # {client_name: score}
+
         print(f"Server started on {self.host}:{self.port}")
 
     @staticmethod
@@ -64,7 +80,7 @@ class GameServer:
 
     def handle_client(self, client: socket.socket, address):
         """Handle a single client."""
-        client_name = 'lox'  # fixme: add name!!!
+        client_name = ''
         print(f"New connection from {address}")
         try:
             while True:
@@ -73,6 +89,22 @@ class GameServer:
                     break
                 message = pickle.loads(data)
                 command = message.get("command")
+
+                if command == 'registration':
+                    client_name = message['name']
+                    client_password = message['password']
+                    data_password = self.names_passwords.get(client_name, '')
+                    if data_password:
+                        if data_password == client_password:
+                            client.sendall(pickle.dumps({'type': 'registration', 'message': 'ok'}))
+                            self.clients_with_name[client] = client_name
+                        else:
+                            client.sendall(pickle.dumps({'type': 'registration', 'message': 'no'}))
+                    else:
+                        with self.lock:
+                            self.names_passwords[client_name] = client_password
+                            client.sendall(pickle.dumps({'type': 'registration', 'message': 'ok'}))
+                            self.clients_with_name[client] = client_name
 
                 if command == 'create_room':
                     room_name = message['room']
