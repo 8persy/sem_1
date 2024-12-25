@@ -17,9 +17,14 @@ class Room:
         self.names = []  # type: [str]
         self.words_history = []  # type: [str]
 
-    def room_broadcast(self, msg_type: str, msg2_type: str, msg: str):
+    def room_broadcast(self, msg_type: str, msg2_type: str, msg):
         for client in self.clients:
-            client.sendall(pickle.dumps({"type": msg_type, msg2_type: msg}))
+            try:
+                client.sendall(pickle.dumps({"type": msg_type, msg2_type: msg}))
+            except Exception as e:
+                print(f'connection error {e}')
+                self.clients.remove(client)
+                client.close()
 
     def is_correct_word(self, word: str):
         if word in self.words_history:
@@ -90,6 +95,7 @@ class GameServer:
                 data = client.recv(1024)
                 if not data:
                     break
+
                 message = pickle.loads(data)
                 command = message.get("command")
 
@@ -110,6 +116,9 @@ class GameServer:
                             self.clients_with_name[client] = client_name
 
                 if command == 'create_room':
+                    if room:
+                        room.remove_client(client, client_name)
+
                     room_name = message['room']
                     room = Room(room_name)
                     self.rooms.append(room)
@@ -117,6 +126,9 @@ class GameServer:
                     room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} created {room_name}')
 
                 if command == "join_room":
+                    if room:
+                        room.remove_client(client, client_name)
+
                     room_name = message['room']
                     for room in self.rooms:
                         if room.name == room_name:
@@ -130,6 +142,8 @@ class GameServer:
                 elif command == "start_game":
                     room_name = message['room']
                     word = random.choice(self.dataset)
+                    self.scores = {}
+                    room.room_broadcast(msg_type='score', msg2_type='scores', msg=self.scores)
 
                     for room in self.rooms:
                         if room.name == room_name:
