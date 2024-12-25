@@ -151,6 +151,9 @@ class GameServer:
                             room.room_broadcast(msg_type='start', msg2_type='word', msg=word)
                             break
 
+                    timer = threading.Timer(60, room.room_broadcast, args=('end', 'message', 'game ended'))
+                    timer.start()
+
                 elif command == "submit_word":
                     room_name = message['room']
                     player = message['player']

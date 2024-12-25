@@ -195,9 +195,12 @@ class MainWindow(QMainWindow):
         if message["type"] == "info":
             self.info_label.setText(message["message"])
         elif message["type"] == "start":
+            self.submit_button.setEnabled(True)
             self.word_label.setText(f"Current Word: {message['word']}")
         elif message["type"] == "score":
             self.update_score_table(message["scores"])
+        elif message['type'] == 'end':
+            self.submit_button.setEnabled(False)
 
     def update_score_table(self, scores):
         self.score_table.setRowCount(len(scores))
