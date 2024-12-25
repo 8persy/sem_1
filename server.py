@@ -27,8 +27,9 @@ class Room:
         return True
 
     def add_client(self, client: socket.socket, name: str):
-        self.clients.append(client)
-        self.names.append(name)
+        if client not in self.clients:
+            self.clients.append(client)
+            self.names.append(name)
 
     def remove_client(self, client: socket.socket, name: str):
         if client in self.clients:

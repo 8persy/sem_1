@@ -4,7 +4,7 @@ import socket
 import threading
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QLabel,
-    QLineEdit, QTableWidget, QTableWidgetItem
+    QLineEdit, QTableWidget, QTableWidgetItem, QGridLayout
 )
 from PyQt6.QtCore import pyqtSignal, QObject
 
@@ -116,6 +116,8 @@ class MainWindow(QMainWindow):
         self.central_widget = QWidget()
         self.layout = QVBoxLayout()
 
+        self.grid = QGridLayout()
+
         self.info_label = QLabel(f"Welcome to Anagrams, {self.client.name}!")
         self.layout.addWidget(self.info_label)
 
@@ -126,11 +128,16 @@ class MainWindow(QMainWindow):
 
         self.create_button = QPushButton("Create Room")
         self.create_button.clicked.connect(self.create_room)
-        self.layout.addWidget(self.create_button)
+        # self.layout.addWidget(self.create_button)
 
         self.join_button = QPushButton("Join Room")
         self.join_button.clicked.connect(self.join_room)
-        self.layout.addWidget(self.join_button)
+        # self.layout.addWidget(self.join_button)
+
+        self.grid.addWidget(self.create_button, 3, 0, 1, 1)
+        self.grid.addWidget(self.join_button, 3, 1, 1, 1)
+
+        self.layout.addLayout(self.grid)
 
         self.start_button = QPushButton("Start Game")
         self.start_button.clicked.connect(self.start_game)
