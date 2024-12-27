@@ -1,3 +1,4 @@
+import time
 from collections import Counter
 import pickle
 import random
@@ -63,6 +64,7 @@ class GameServer:
 
         # rooms
         self.rooms = []  # type: [Room] # {room_name: [clients]}
+        self.rooms_names = []
 
         # data of words
         words = Words()
@@ -120,16 +122,25 @@ class GameServer:
                         room.remove_client(client, client_name)
 
                     room_name = message['room']
-                    room = Room(room_name)
-                    self.rooms.append(room)
-                    room.add_client(client, client_name)
-                    room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} created {room_name}')
+                    if room_name not in self.rooms_names:
+                        client.sendall(pickle.dumps({'type': 'created', 'message': room_name}))
+
+                        room = Room(room_name)
+                        self.rooms.append(room)
+                        self.rooms_names.append(room_name)
+                        room.add_client(client, client_name)
+                        room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} created {room_name}')
+                    else:
+                        client.sendall(pickle.dumps({'type': 'info',
+                                                     'message': f'this room already created. you can join it'}))
 
                 if command == "join_room":
                     if room:
                         room.remove_client(client, client_name)
 
                     room_name = message['room']
+                    client.sendall(pickle.dumps({'type': 'joined', 'message': room_name}))
+
                     for room in self.rooms:
                         if room.name == room_name:
                             room.add_client(client, client_name)
@@ -138,6 +149,10 @@ class GameServer:
                             break
                     else:
                         client.sendall(pickle.dumps({'type': 'info', 'message': "There's no room like this"}))
+
+                elif command == 'leave_room':
+                    room.remove_client(client, client_name)
+                    room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} leave room')
 
                 elif command == "start_game":
                     room_name = message['room']
