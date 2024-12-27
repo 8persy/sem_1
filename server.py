@@ -1,4 +1,3 @@
-import time
 from collections import Counter
 import pickle
 import random
@@ -14,18 +13,74 @@ PORT = 65432
 class Room:
     def __init__(self, name: str):
         self.name = name
-        self.clients = []  # type: [socket.socket]
+        self.clients = []
         self.names = []  # type: [str]
         self.words_history = []  # type: [str]
+        self.game_started = False
+        self.active_players = []
 
-    def room_broadcast(self, msg_type: str, msg2_type: str, msg):
-        for client in self.clients:
-            try:
-                client.sendall(pickle.dumps({"type": msg_type, msg2_type: msg}))
-            except Exception as e:
-                print(f'connection error {e}')
-                self.clients.remove(client)
-                client.close()
+        self.scores = {}
+        self.current_word = ''
+
+        words = Words()
+        self.dataset = words.words
+
+    @staticmethod
+    def check_word(reference, word):
+        word_counter = Counter(word)
+        reference_counter = Counter(reference)
+
+        for letter, count in word_counter.items():
+            if count > reference_counter.get(letter, 0):
+                return False
+
+        return True
+
+    def start_game(self, client: socket.socket):
+        if self.game_started:
+            self.active_players.append(client)
+        else:
+            self.game_started = True
+            self.active_players.append(client)
+            self.room_broadcast(msg_type='info', msg2_type='message', msg='press start to play game', all=True)
+            timer = threading.Timer(10, self.start)
+            timer.start()
+
+    def start(self):
+        self.current_word = random.choice(self.dataset)
+        self.room_broadcast(msg_type='start', msg2_type='word', msg=self.current_word, all=False)
+        timer = threading.Timer(60, self.game_end)
+        timer.start()
+
+    def game_end(self):
+        self.room_broadcast(msg_type='end', msg2_type='message', msg='game ended', all=False)
+        self.active_players = []
+
+    def submit_word(self, player, word):
+        if (self.check_word(word=word, reference=self.current_word)
+                and self.is_correct_word(word)):
+            self.scores[player] = self.scores.get(player, 0) + 1
+            self.room_broadcast(msg_type='score', msg2_type='scores', msg=self.scores, all=False)
+            self.words_history.append(word)
+
+    def room_broadcast(self, msg_type: str, msg2_type: str, msg, all: bool):
+        if all:
+            for client in self.clients:
+                try:
+                    client.sendall(pickle.dumps({"type": msg_type, msg2_type: msg}))
+                except Exception as e:
+                    print(f'connection error {e}')
+                    self.clients.remove(client)
+                    client.close()
+        else:
+            for client in self.active_players:
+                try:
+                    client.sendall(pickle.dumps({"type": msg_type, msg2_type: msg}))
+                except Exception as e:
+                    print(f'connection error {e}')
+                    self.clients.remove(client)
+                    self.active_players.remove(client)
+                    client.close()
 
     def is_correct_word(self, word: str):
         if word in self.words_history:
@@ -40,8 +95,9 @@ class Room:
     def remove_client(self, client: socket.socket, name: str):
         if client in self.clients:
             self.clients.remove(client)
+            self.active_players.remove(client)
             self.names.remove(name)
-            self.room_broadcast(msg_type='info', msg2_type='message', msg=f'player {name} left game')
+            self.room_broadcast(msg_type='info', msg2_type='message', msg=f'player {name} left game', all=True)
 
 
 # Server Code
@@ -75,17 +131,6 @@ class GameServer:
         self.scores = {}  # type: {str: int} # {client_name: score}
 
         print(f"Server started on {self.host}:{self.port}")
-
-    @staticmethod
-    def check_word(reference, word):
-        word_counter = Counter(word)
-        reference_counter = Counter(reference)
-
-        for letter, count in word_counter.items():
-            if count > reference_counter.get(letter, 0):
-                return False
-
-        return True
 
     def handle_client(self, client: socket.socket, address):
         """Handle a single client."""
@@ -129,7 +174,8 @@ class GameServer:
                         self.rooms.append(room)
                         self.rooms_names.append(room_name)
                         room.add_client(client, client_name)
-                        room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} created {room_name}')
+                        room.room_broadcast(msg_type='info', msg2_type='message',
+                                            msg=f'{client_name} created {room_name}', all=True)
                     else:
                         client.sendall(pickle.dumps({'type': 'info',
                                                      'message': f'this room already created. you can join it'}))
@@ -145,45 +191,27 @@ class GameServer:
                         if room.name == room_name:
                             room.add_client(client, client_name)
                             room.room_broadcast(msg_type='info', msg2_type='message',
-                                                msg=f'{client_name} joined {room_name}')
+                                                msg=f'{client_name} joined {room_name}', all=True)
                             break
                     else:
                         client.sendall(pickle.dumps({'type': 'info', 'message': "There's no room like this"}))
 
                 elif command == 'leave_room':
                     room.remove_client(client, client_name)
-                    room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} leave room')
+                    room.room_broadcast(msg_type='info', msg2_type='message', msg=f'{client_name} leave room', all=True)
 
                 elif command == "start_game":
-                    room_name = message['room']
-                    word = random.choice(self.dataset)
                     self.scores = {}
-                    room.room_broadcast(msg_type='score', msg2_type='scores', msg=self.scores)
+                    room.room_broadcast(msg_type='score', msg2_type='scores', msg=self.scores, all=True)
 
-                    for room in self.rooms:
-                        if room.name == room_name:
-                            self.current_words[room_name] = word
-                            room.room_broadcast(msg_type='start', msg2_type='word', msg=word)
-                            break
-
-                    timer = threading.Timer(60, room.room_broadcast, args=('end', 'message', 'game ended'))
-                    timer.start()
+                    room.start_game(client=client)
+                    client.sendall(pickle.dumps({'type': 'info', 'message': 'you are in game'}))
 
                 elif command == "submit_word":
-                    room_name = message['room']
                     player = message['player']
                     word = message["word"]
 
-                    for curr_room in self.rooms:
-                        if room_name == curr_room.name:
-                            room = curr_room
-
-                            if (self.check_word(word=word, reference=self.current_words[room_name])
-                                    and room.is_correct_word(word)):
-                                self.scores[player] = self.scores.get(player, 0) + 1
-                                room.room_broadcast(msg_type='score', msg2_type='scores', msg=self.scores)
-                                room.words_history.append(word)
-                                break
+                    room.submit_word(player, word)
 
                 elif command == 'exit':
                     self.clients.remove(client)
