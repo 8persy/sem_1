@@ -47,14 +47,21 @@ class Room:
             timer.start()
 
     def start(self):
-        self.current_word = random.choice(self.dataset)
-        self.room_broadcast(msg_type='start', msg2_type='word', msg=self.current_word, all=False)
-        timer = threading.Timer(60, self.game_end)
-        timer.start()
+        if len(self.active_players) > 1:
+            self.current_word = random.choice(self.dataset)
+            self.room_broadcast(msg_type='start', msg2_type='word', msg=self.current_word, all=False)
+            timer = threading.Timer(60, self.game_end)
+            timer.start()
+        else:
+            self.room_broadcast(msg_type='info', msg2_type='message', msg='you can not play alone', all=False)
+            self.active_players.clear()
 
     def game_end(self):
         self.room_broadcast(msg_type='end', msg2_type='message', msg='game ended', all=False)
         self.active_players = []
+        self.game_started = False
+        self.scores.clear()
+        self.words_history.clear()
 
     def submit_word(self, player, word):
         if (self.check_word(word=word, reference=self.current_word)
@@ -95,7 +102,7 @@ class Room:
     def remove_client(self, client: socket.socket, name: str):
         if client in self.clients:
             self.clients.remove(client)
-            self.active_players.remove(client)
+            # self.active_players.remove(client)
             self.names.remove(name)
             self.room_broadcast(msg_type='info', msg2_type='message', msg=f'player {name} left game', all=True)
 
