@@ -11,16 +11,19 @@ PORT = 65432
 
 
 class Room:
-    def __init__(self, name: str):
+    def __init__(self, name: str, client: 'GameServer'):
         self.name = name
+        self.client = client
+
         self.clients = []
         self.names = []  # type: [str]
         self.words_history = []  # type: [str]
         self.game_started = False
         self.active_players = []
 
-        self.scores = {}
+        self.scores = Counter()
         self.current_word = ''
+        self.current_winner = ()  # type: (str, int)
 
         words = Words()
         self.dataset = words.words
@@ -50,7 +53,7 @@ class Room:
         if len(self.active_players) > 1:
             self.current_word = random.choice(self.dataset)
             self.room_broadcast(msg_type='start', msg2_type='word', msg=self.current_word, all=False)
-            timer = threading.Timer(60, self.game_end)
+            timer = threading.Timer(10, self.game_end)
             timer.start()
         else:
             self.room_broadcast(msg_type='info', msg2_type='message', msg='you can not play alone', all=False)
@@ -58,6 +61,9 @@ class Room:
 
     def game_end(self):
         self.room_broadcast(msg_type='end', msg2_type='message', msg='game ended', all=False)
+        self.current_winner = self.scores.most_common(1)
+        self.client.update_table(self.current_winner[0][0])
+
         self.active_players = []
         self.game_started = False
         self.scores.clear()
@@ -136,6 +142,7 @@ class GameServer:
 
         # for tables or scores
         self.scores = {}  # type: {str: int} # {client_name: score}
+        self.table = Counter()
 
         print(f"Server started on {self.host}:{self.port}")
 
@@ -177,7 +184,7 @@ class GameServer:
                     if room_name not in self.rooms_names:
                         client.sendall(pickle.dumps({'type': 'created', 'message': room_name}))
 
-                        room = Room(room_name)
+                        room = Room(room_name, self)
                         self.rooms.append(room)
                         self.rooms_names.append(room_name)
                         room.add_client(client, client_name)
@@ -231,6 +238,16 @@ class GameServer:
             print(f"Closing connection with {address}")
             client.close()
 
+    def update_table(self, client_name: str):
+        self.table[client_name] = self.table.get(client_name, 0) + 1
+        send_table = self.table.most_common(len(self.table))
+        for client in self.clients:
+            try:
+                client.sendall(pickle.dumps({'type': 'table', 'message': send_table}))
+            except Exception as e:
+                print(f'error with {client} with exception {e}')
+                self.clients.remove(client)
+
     def start(self):
         """Start the server and handle incoming connections."""
         try:
@@ -246,6 +263,5 @@ class GameServer:
 
 # Main Execution
 if __name__ == "__main__":
-    # Start server in a separate thread
     server = GameServer(HOST, PORT)
     threading.Thread(target=server.start).start()

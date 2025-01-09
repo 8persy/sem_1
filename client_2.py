@@ -128,6 +128,11 @@ class MainWindow(QMainWindow):
         self.info_label = QLabel(f"Welcome to Anagrams, {self.client.name}!")
         self.layout.addWidget(self.info_label)
 
+        self.score_table = QTableWidget()
+        self.score_table.setColumnCount(2)
+        self.score_table.setHorizontalHeaderLabels(["Player", "Score"])
+        self.layout.addWidget(self.score_table)
+
         self.room_input = QLineEdit()
         # self.room_input.editingFinished.connect(self.join_room)
         self.room_input.setPlaceholderText("Enter room name")
@@ -155,6 +160,12 @@ class MainWindow(QMainWindow):
 
         self.show()
 
+    def update_score_table(self, scores):
+        self.score_table.setRowCount(len(scores))
+        for i, (player, score) in enumerate(scores):
+            self.score_table.setItem(i, 0, QTableWidgetItem(player))
+            self.score_table.setItem(i, 1, QTableWidgetItem(str(score)))
+
     def create_room(self):
         room_name = self.room_input.text()
         if room_name:
@@ -168,6 +179,7 @@ class MainWindow(QMainWindow):
     def handle_server_message(self, message):
         if message["type"] == "info":
             self.info_label.setText(message["message"])
+
         if message["type"] == 'created':
             room_name = message['message']
             if not self.hidden:
@@ -175,6 +187,7 @@ class MainWindow(QMainWindow):
                 self.hide()
                 self.room_window = RoomWindow(client=self.client, room_name=room_name, main_window=self)
                 self.room_window.show()
+
         if message["type"] == 'joined':
             room_name = message['message']
             if not self.hidden:
@@ -182,6 +195,10 @@ class MainWindow(QMainWindow):
                 self.hide()
                 self.room_window = RoomWindow(client=self.client, room_name=room_name, main_window=self)
                 self.room_window.show()
+
+        if message["type"] == 'table':
+            scores = message["message"]
+            self.update_score_table(scores)
 
     def exit(self):
         self.client.send({"command": "exit"})
