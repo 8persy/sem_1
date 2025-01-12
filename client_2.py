@@ -160,11 +160,13 @@ class MainWindow(QMainWindow):
 
         self.show()
 
-    def update_score_table(self, scores):
+    def update_score_table(self, scores: dict):
         self.score_table.setRowCount(len(scores))
-        for i, (player, score) in enumerate(scores):
+        for i, (player, score) in enumerate(scores.items()):
             self.score_table.setItem(i, 0, QTableWidgetItem(player))
             self.score_table.setItem(i, 1, QTableWidgetItem(str(score)))
+
+        self.info_label.setText('leaderboard')
 
     def create_room(self):
         room_name = self.room_input.text()

@@ -1,10 +1,12 @@
+import json
+import time
 from collections import Counter
 import pickle
 import random
 import socket
 import threading
 from threading import Lock
-from words import Words
+from data.words import Words
 # Constants
 HOST = '127.0.0.1'
 PORT = 65432
@@ -84,6 +86,7 @@ class Room:
                 except Exception as e:
                     print(f'connection error {e}')
                     self.clients.remove(client)
+                    self.active_players.remove(client)
                     client.close()
         else:
             for client in self.active_players:
@@ -163,18 +166,30 @@ class GameServer:
                 if command == 'registration':
                     client_name = message['name']
                     client_password = message['password']
-                    data_password = self.names_passwords.get(client_name, '')
+
+                    with open('data/passwords.json', 'r') as file:
+                        data = json.load(file)
+                        data_password = data.get(client_name, '')
+
                     if data_password:
                         if data_password == client_password:
                             client.sendall(pickle.dumps({'type': 'registration', 'message': 'ok'}))
+                            time.sleep(0.3)
                             self.clients_with_name[client] = client_name
+                            self.send_table(client)
                         else:
                             client.sendall(pickle.dumps({'type': 'registration', 'message': 'no'}))
                     else:
                         with self.lock:
-                            self.names_passwords[client_name] = client_password
+                            data[client_name] = client_password
+
+                            with open('data/passwords.json', 'w') as file:
+                                json.dump(data, file, indent=4)
+
                             client.sendall(pickle.dumps({'type': 'registration', 'message': 'ok'}))
+                            time.sleep(0.3)
                             self.clients_with_name[client] = client_name
+                            self.send_table(client)
 
                 if command == 'create_room':
                     if room:
@@ -239,21 +254,41 @@ class GameServer:
             client.close()
 
     def update_table(self, client_name: str):
-        self.table[client_name] = self.table.get(client_name, 0) + 1
-        send_table = self.table.most_common(len(self.table))
-        for client in self.clients:
-            try:
-                client.sendall(pickle.dumps({'type': 'table', 'message': send_table}))
-            except Exception as e:
-                print(f'error with {client} with exception {e}')
-                self.clients.remove(client)
+        with self.lock:
+            with open('data/scores.json', 'r') as file:
+                data = json.load(file)
+                data[client_name] = data.get(client_name, 0) + 1
+
+            send_table = dict(sorted(data.items(), key=lambda item: item[1], reverse=True))
+
+            for client in self.clients:
+
+                try:
+                    client.sendall(pickle.dumps({'type': 'table', 'message': send_table}))
+                except Exception as e:
+                    print(f'error with {client} with exception {e}')
+                    self.clients.remove(client)
+
+            with open('data/scores.json', 'w') as file:
+                json.dump(send_table, file, indent=4)
+
+    def send_table(self, client: socket.socket):
+        with open('data/scores.json', 'r') as file:
+            data = json.load(file)
+
+        try:
+            client.sendall(pickle.dumps({'type': 'table', 'message': data}))
+        except Exception as e:
+            print(f'error with {client} with exception {e}')
+            self.clients.remove(client)
 
     def start(self):
         """Start the server and handle incoming connections."""
         try:
             while True:
                 client, address = self.server_socket.accept()
-                self.clients.append(client)
+                with self.lock:
+                    self.clients.append(client)
                 threading.Thread(target=self.handle_client, args=(client, address), daemon=True).start()
         except KeyboardInterrupt:
             print("Shutting down server.")
