@@ -50,13 +50,17 @@ class Room:
             self.room_broadcast(msg_type='info', msg2_type='message', msg='press start to play game', all=True)
             timer = threading.Timer(10, self.start)
             timer.start()
+            time.sleep(0.2)
+            self.room_broadcast(msg_type='timer', msg2_type='message', msg='10', all=True)
 
     def start(self):
         if len(self.active_players) > 1:
             self.current_word = random.choice(self.dataset)
             self.room_broadcast(msg_type='start', msg2_type='word', msg=self.current_word, all=False)
-            timer = threading.Timer(10, self.game_end)
+            timer = threading.Timer(60, self.game_end)
             timer.start()
+            self.room_broadcast(msg_type='timer', msg2_type='message', msg='60', all=False)
+
         else:
             self.room_broadcast(msg_type='info', msg2_type='message', msg='you can not play alone', all=False)
             self.active_players.clear()
@@ -95,8 +99,9 @@ class Room:
                     client.sendall(pickle.dumps({"type": msg_type, msg2_type: msg}))
                 except Exception as e:
                     print(f'connection error {e}')
-                    self.clients.remove(client)
-                    self.active_players.remove(client)
+                    self.remove_client(client, 'lol')
+                    # self.clients.remove(client)
+                    # self.active_players.remove(client)
                     client.close()
 
     def is_correct_word(self, word: str):
@@ -113,7 +118,7 @@ class Room:
         if client in self.clients:
             self.clients.remove(client)
             # self.active_players.remove(client)
-            self.names.remove(name)
+            # self.names.remove(name)
             self.room_broadcast(msg_type='info', msg2_type='message', msg=f'player {name} left game', all=True)
 
 
@@ -178,6 +183,8 @@ class GameServer:
                             time.sleep(0.3)
                             self.clients_with_name[client] = client_name
                             self.send_table(client)
+                            time.sleep(0.01)
+                            self.rooms_update()
                         else:
                             client.sendall(pickle.dumps({'type': 'registration', 'message': 'no'}))
                     else:
@@ -191,6 +198,8 @@ class GameServer:
                             time.sleep(0.3)
                             self.clients_with_name[client] = client_name
                             self.send_table(client)
+                            time.sleep(0.01)
+                            self.rooms_update()
 
                 if command == 'create_room':
                     if room:

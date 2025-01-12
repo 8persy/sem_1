@@ -2,6 +2,8 @@ import sys
 import pickle
 import socket
 import threading
+import time
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QLabel,
     QLineEdit, QTableWidget, QTableWidgetItem, QGridLayout
@@ -229,6 +231,9 @@ class RoomWindow(QWidget):
         super().__init__()
         self.client = client
         self.client.update_signal.connect(self.handle_server_message)
+
+        self.in_game = False
+
         self.main_window = main_window
         self.central_widget = QWidget()
         self.layout = QVBoxLayout()
@@ -275,6 +280,7 @@ class RoomWindow(QWidget):
 
     def start_game(self):
         if self.name:
+            self.in_game = True
             self.client.send({"command": "start_game", "room": self.name})
 
     def submit_word(self):
@@ -291,18 +297,43 @@ class RoomWindow(QWidget):
 
     def handle_server_message(self, message):
         if message["type"] == "start":
+            self.info_label.setText('game started')
             self.submit_button.setEnabled(True)
             self.leave_button.setEnabled(False)
             self.start_button.setEnabled(False)
             self.word_label.setText(f"Current Word: {message['word']}")
+
         elif message["type"] == "info":
             self.info_label.setText(message["message"])
+
+        elif message["type"] == 'timer':
+            print('timer')
+            seconds = int(message['message'])
+            threading.Thread(target=self.set_timer, args=(seconds,), daemon=True).start()
+
         elif message["type"] == "score":
             self.update_score_table(message["scores"])
+
         elif message['type'] == 'end':
+            self.in_game = False
+            self.info_label.setText('game over')
             self.submit_button.setEnabled(False)
             self.leave_button.setEnabled(True)
             self.start_button.setEnabled(True)
+
+    def set_timer(self, seconds):
+        if seconds == 10:
+            for i in range(seconds - 1, -1, -1):
+                time.sleep(0.93)
+                if self.in_game:
+                    break
+                self.info_label.setText(f'you have {i} seconds to press start')
+        elif seconds == 60:
+            for i in range(seconds - 1, -1, -1):
+                time.sleep(0.96)
+                if not self.in_game:
+                    break
+                self.info_label.setText(f'you have {i} seconds to submit words')
 
     def leave_room(self):
         self.client.send({"command": "leave_room", "room": self.name})
