@@ -60,6 +60,7 @@ class Room:
         else:
             self.room_broadcast(msg_type='info', msg2_type='message', msg='you can not play alone', all=False)
             self.active_players.clear()
+            self.game_started = False
 
     def game_end(self):
         self.room_broadcast(msg_type='end', msg2_type='message', msg='game ended', all=False)
@@ -214,10 +215,10 @@ class GameServer:
                         room.remove_client(client, client_name)
 
                     room_name = message['room']
-                    client.sendall(pickle.dumps({'type': 'joined', 'message': room_name}))
 
                     for room in self.rooms:
                         if room.name == room_name:
+                            client.sendall(pickle.dumps({'type': 'joined', 'message': room_name}))
                             room.add_client(client, client_name)
                             room.room_broadcast(msg_type='info', msg2_type='message',
                                                 msg=f'{client_name} joined {room_name}', all=True)
