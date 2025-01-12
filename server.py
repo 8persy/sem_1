@@ -68,8 +68,11 @@ class Room:
 
     def game_end(self):
         self.room_broadcast(msg_type='end', msg2_type='message', msg='game ended', all=False)
-        self.current_winner = self.scores.most_common(1)
-        self.client.update_table(self.current_winner[0][0])
+        try:
+            self.current_winner = self.scores.most_common(1)
+            self.client.update_table(self.current_winner[0][0])
+        except Exception as e:
+            print(f'exception {e}')
 
         self.active_players = []
         self.game_started = False
@@ -90,8 +93,7 @@ class Room:
                     client.sendall(pickle.dumps({"type": msg_type, msg2_type: msg}))
                 except Exception as e:
                     print(f'connection error {e}')
-                    self.clients.remove(client)
-                    self.active_players.remove(client)
+                    self.remove_client(client, 'lol')
                     client.close()
         else:
             for client in self.active_players:
@@ -100,8 +102,6 @@ class Room:
                 except Exception as e:
                     print(f'connection error {e}')
                     self.remove_client(client, 'lol')
-                    # self.clients.remove(client)
-                    # self.active_players.remove(client)
                     client.close()
 
     def is_correct_word(self, word: str):
@@ -117,8 +117,8 @@ class Room:
     def remove_client(self, client: socket.socket, name: str):
         if client in self.clients:
             self.clients.remove(client)
-            # self.active_players.remove(client)
-            # self.names.remove(name)
+            if name in self.names:
+                self.names.remove(name)
             self.room_broadcast(msg_type='info', msg2_type='message', msg=f'player {name} left game', all=True)
 
 
@@ -156,7 +156,6 @@ class GameServer:
         print(f"Server started on {self.host}:{self.port}")
 
     def handle_client(self, client: socket.socket, address):
-        """Handle a single client."""
         client_name = ''
         room = None
         print(f"New connection from {address}")
@@ -305,7 +304,6 @@ class GameServer:
             self.clients.remove(client)
 
     def start(self):
-        """Start the server and handle incoming connections."""
         try:
             while True:
                 client, address = self.server_socket.accept()
