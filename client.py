@@ -125,13 +125,23 @@ class MainWindow(QMainWindow):
 
         self.grid = QGridLayout()
 
-        self.info_label = QLabel(f"Welcome to Anagrams, {self.client.name}!")
-        self.layout.addWidget(self.info_label)
+        self.table_grid = QGridLayout()
 
         self.score_table = QTableWidget()
         self.score_table.setColumnCount(2)
         self.score_table.setHorizontalHeaderLabels(["Player", "Score"])
-        self.layout.addWidget(self.score_table)
+        self.table_grid.addWidget(self.score_table, 3, 0, 1, 1)
+        # self.layout.addWidget(self.score_table)
+
+        self.room_table = QTableWidget()
+        self.room_table.setColumnCount(1)
+        self.room_table.setHorizontalHeaderLabels(['Rooms'])
+        self.table_grid.addWidget(self.room_table, 3, 1, 1, 1)
+
+        self.layout.addLayout(self.table_grid)
+
+        self.info_label = QLabel(f"Welcome to Anagrams, {self.client.name}!")
+        self.layout.addWidget(self.info_label)
 
         self.room_input = QLineEdit()
         # self.room_input.editingFinished.connect(self.join_room)
@@ -201,6 +211,12 @@ class MainWindow(QMainWindow):
         if message["type"] == 'table':
             scores = message["message"]
             self.update_score_table(scores)
+
+        if message['type'] == 'rooms':
+            rooms = message['message']
+            self.room_table.setRowCount(len(rooms))
+            for i, room in enumerate(rooms):
+                self.room_table.setItem(i, 0, QTableWidgetItem(room))
 
     def exit(self):
         self.client.send({"command": "exit"})

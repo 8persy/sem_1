@@ -206,6 +206,9 @@ class GameServer:
                         room.add_client(client, client_name)
                         room.room_broadcast(msg_type='info', msg2_type='message',
                                             msg=f'{client_name} created {room_name}', all=True)
+
+                        self.rooms_update()
+
                     else:
                         client.sendall(pickle.dumps({'type': 'info',
                                                      'message': f'this room already created. you can join it'}))
@@ -253,6 +256,15 @@ class GameServer:
         finally:
             print(f"Closing connection with {address}")
             client.close()
+
+    def rooms_update(self):
+        time.sleep(0.3)
+        for client in self.clients:
+            try:
+                client.sendall(pickle.dumps({'type': 'rooms', 'message': self.rooms_names}))
+            except Exception as e:
+                print(f'error with {client} with exception {e}')
+                self.clients.remove(client)
 
     def update_table(self, client_name: str):
         with self.lock:
