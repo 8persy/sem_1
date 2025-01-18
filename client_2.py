@@ -307,7 +307,6 @@ class RoomWindow(QWidget):
             self.info_label.setText(message["message"])
 
         elif message["type"] == 'timer':
-            print('timer')
             seconds = int(message['message'])
             threading.Thread(target=self.set_timer, args=(seconds,), daemon=True).start()
 
